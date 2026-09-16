@@ -44,10 +44,10 @@
     font-size:16px;
     line-height:1.5;
     -webkit-font-smoothing:antialiased;
-    overflow:hidden;
+    overflow-x:hidden;
   }
 
-  body.reading{overflow:auto}
+  body.reading{overflow:hidden}
 
   /* ---- the void ---- */
 
@@ -424,108 +424,50 @@
     white-space:nowrap;
   }
 
-  .dialwrap{
+  #spacer{width:1px;pointer-events:none}
+
+  .idx button[aria-current="true"]{color:var(--text)}
+  .idx button[aria-current="true"]::before{width:2.5rem;background:var(--signal)}
+
+  .readnow{
     position:fixed;
     left:50%;
-    bottom:2.25rem;
+    bottom:2rem;
     transform:translateX(-50%);
-    width:min(30vmin,12rem);
-    aspect-ratio:1;
-    z-index:4;
-    pointer-events:none;
-  }
-
-  .dialwrap svg{width:100%;height:100%;display:block;overflow:visible}
-
-  #ring{transition:transform 1.05s cubic-bezier(.22,.75,.24,1)}
-
-  .spoke{
-    fill:none;
-    stroke:var(--signal);
-    stroke-width:1.4;
-    opacity:0.30;
-    transition:opacity .35s ease,stroke-width .35s ease;
-  }
-
-  .spoke.on{opacity:1;stroke-width:2.6}
-  .spoke.on{filter:drop-shadow(0 0 6px rgba(91,140,255,0.55))}
-
-  .dial-hit{
-    position:absolute;
-    left:50%;
-    top:50%;
-    width:2.75rem;
-    height:2.75rem;
-    margin:-1.375rem 0 0 -1.375rem;
-    border:0;
-    background:none;
-    padding:0;
-    cursor:pointer;
-    pointer-events:auto;
-    border-radius:50%;
-  }
-
-  .dial-core{
-    position:absolute;
-    left:50%;
-    top:50%;
-    transform:translate(-50%,-50%);
-    width:44%;
-    aspect-ratio:1;
-    border-radius:50%;
-    border:0;
-    background:none;
-    padding:0;
-    cursor:pointer;
-    pointer-events:auto;
-    display:grid;
-    place-content:center;
-    gap:0.4rem;
-    font-family:var(--mono);
-    color:var(--dim);
-    transition:color .2s ease;
-  }
-
-  .dial-core:hover{color:var(--text)}
-
-  .dial-core .now{
-    font-size:0.6875rem;
-    font-weight:500;
-    line-height:1.4;
-    max-width:9rem;
-    color:var(--text);
-  }
-
-  .dial-core .go{
-    font-size:0.625rem;
-    color:var(--signal);
-    letter-spacing:0.14em;
-  }
-
-  .dial-step{
-    position:absolute;
-    top:-2.25rem;
-    left:50%;
-    transform:translateX(-50%);
+    z-index:5;
     display:flex;
-    gap:1.25rem;
-    pointer-events:auto;
+    align-items:center;
+    gap:0.75rem;
+    padding:0.625rem 1.125rem;
+    border:1px solid var(--line);
+    border-radius:2rem;
+    background:rgba(12,14,20,0.72);
+    backdrop-filter:blur(6px);
     font-family:var(--mono);
     font-size:0.6875rem;
-  }
-
-  .dial-step button{
-    background:none;
-    border:0;
-    color:var(--faint);
+    color:var(--dim);
     cursor:pointer;
-    padding:0.25rem 0.5rem;
-    font-family:var(--mono);
-    font-size:0.6875rem;
-    transition:color .18s ease;
+    transition:color .18s ease,border-color .18s ease;
   }
 
-  .dial-step button:hover{color:var(--text)}
+  .readnow:hover{color:var(--text);border-color:var(--signal)}
+  .readnow b{color:var(--text);font-weight:500}
+  .readnow span{color:var(--signal)}
+
+  .hint{
+    position:fixed;
+    left:50%;
+    bottom:5.5rem;
+    transform:translateX(-50%);
+    z-index:5;
+    font-family:var(--mono);
+    font-size:0.625rem;
+    color:var(--faint);
+    pointer-events:none;
+    transition:opacity .5s ease;
+  }
+
+  .hint.gone{opacity:0}
 
   .localnote{
     position:fixed;
@@ -542,12 +484,6 @@
   }
 
   @media (max-width:46rem){
-    .dialwrap{
-      width:min(62vmin,15rem);
-      top:50%;
-      bottom:auto;
-      transform:translate(-50%,-50%);
-    }
   }
 
   .panel-nav{
@@ -639,6 +575,14 @@
 
   <div class="br">Applying to Recalc</div>
 </div>
+
+<button class="readnow" id="readNow" type="button">
+  <b id="readNowLabel">why finance</b><span>Read</span>
+</button>
+
+<p class="hint" id="hint">Scroll</p>
+
+<div id="spacer"></div>
 
 <div class="panel" id="panel" hidden role="dialog" aria-modal="true" aria-labelledby="panelTitle">
   <div class="panel-bar">
@@ -901,13 +845,14 @@
   var panelClose = document.getElementById("panelClose");
   var idx = document.getElementById("idx");
   var lastFocus = null;
+  var keptScroll = 0;
 
   /* ---------- index list in the frame ---------- */
   articles.forEach(function(a){
     var b = document.createElement("button");
     b.type = "button";
     b.textContent = a.dataset.label;
-    b.setAttribute("data-open", a.id.replace("sec-",""));
+    b.setAttribute("data-goto", String(articles.indexOf(a)));
     idx.appendChild(b);
   });
 
@@ -963,21 +908,20 @@
     });
     panelInner.appendChild(nav);
 
+    keptScroll = window.scrollY;
     panel.hidden = false;
     document.body.classList.add("reading");
     panel.scrollTop = 0;
     wirePanel();
     panelClose.focus();
 
-    idx.querySelectorAll("button").forEach(function(b){
-      b.setAttribute("aria-current", b.dataset.open === key ? "true" : "false");
-    });
   }
 
   function closePanel(){
     panel.hidden = true;
     panelInner.innerHTML = "";
     document.body.classList.remove("reading");
+    window.scrollTo(0, keptScroll);
     idx.querySelectorAll("button").forEach(function(b){ b.setAttribute("aria-current","false"); });
     if(lastFocus && lastFocus.focus) lastFocus.focus();
   }
@@ -1089,144 +1033,6 @@
   setTimeout(function(){ bootTarget = 100; }, 6000);
   setTimeout(bootFinish, 9000);
 
-  /* ---------- the dial: spins, and steps through the content ---------- */
-  var dialIndex = 0;
-  var dialTimer = null;
-  var dialHeld = false;
-  var nowLabel, coreBtn, ringG, spokes = [];
-
-  function buildDial(){
-    var n = articles.length;
-    var wrap = document.createElement("div");
-    wrap.className = "dialwrap";
-
-    var NS = "http://www.w3.org/2000/svg";
-    var svg = document.createElementNS(NS,"svg");
-    svg.setAttribute("viewBox","-150 -150 300 300");
-    svg.setAttribute("aria-hidden","true");
-
-    var defs = document.createElementNS(NS,"defs");
-    var pat = document.createElementNS(NS,"pattern");
-    pat.setAttribute("id","hatch");
-    pat.setAttribute("width","5"); pat.setAttribute("height","5");
-    pat.setAttribute("patternUnits","userSpaceOnUse");
-    pat.setAttribute("patternTransform","rotate(45)");
-    var pl = document.createElementNS(NS,"line");
-    pl.setAttribute("x1","0"); pl.setAttribute("y1","0");
-    pl.setAttribute("x2","0"); pl.setAttribute("y2","5");
-    pl.setAttribute("stroke","#5B8CFF"); pl.setAttribute("stroke-width","1");
-    pl.setAttribute("opacity","0.5");
-    pat.appendChild(pl); defs.appendChild(pat); svg.appendChild(defs);
-
-    /* hatched core disc, always turning */
-    var core = document.createElementNS(NS,"g");
-    var cd = document.createElementNS(NS,"circle");
-    cd.setAttribute("r","50"); cd.setAttribute("fill","url(#hatch)");
-    cd.setAttribute("opacity","0.42");
-    var cr = document.createElementNS(NS,"circle");
-    cr.setAttribute("r","50"); cr.setAttribute("fill","none");
-    cr.setAttribute("stroke","#5B8CFF"); cr.setAttribute("stroke-width","1");
-    cr.setAttribute("opacity","0.45");
-    core.appendChild(cd); core.appendChild(cr);
-    core.setAttribute("id","dialcore");
-    svg.appendChild(core);
-
-    /* petals, one per section */
-    ringG = document.createElementNS(NS,"g");
-    ringG.setAttribute("id","ring");
-    for(var i=0;i<n;i++){
-      var a = (360/n)*i;
-      var g = document.createElementNS(NS,"g");
-      g.setAttribute("transform","rotate("+a+")");
-      var pth = document.createElementNS(NS,"path");
-      pth.setAttribute("class","spoke");
-      pth.setAttribute("d","M 0,-68 C 13,-84 13,-104 0,-120 C -13,-104 -13,-84 0,-68");
-      g.appendChild(pth);
-      spokes.push(pth);
-      ringG.appendChild(g);
-    }
-    svg.appendChild(ringG);
-
-    /* fixed marker at twelve o'clock */
-    var mk = document.createElementNS(NS,"path");
-    mk.setAttribute("d","M 0,-128 l -4.5,-8 h 9 z");
-    mk.setAttribute("fill","#5B8CFF");
-    svg.appendChild(mk);
-
-    wrap.appendChild(svg);
-
-    /* centre: opens whatever is currently selected */
-    coreBtn = document.createElement("button");
-    coreBtn.type = "button";
-    coreBtn.className = "dial-core";
-    nowLabel = document.createElement("span");
-    nowLabel.className = "now";
-    var go = document.createElement("span");
-    go.className = "go";
-    go.textContent = "Read";
-    coreBtn.appendChild(nowLabel);
-    coreBtn.appendChild(go);
-    coreBtn.addEventListener("click", function(){ openPanel(keyAt(dialIndex)); });
-    wrap.appendChild(coreBtn);
-
-    /* one hit target per petal, real buttons so focus behaves */
-    for(var j=0;j<n;j++){
-      (function(k){
-        var a = (360/n)*k;
-        var b = document.createElement("button");
-        b.type = "button";
-        b.className = "dial-hit";
-        b.style.transform = "rotate("+a+"deg) translateY(-34%) rotate("+(-a)+"deg)";
-        b.setAttribute("aria-label", articles[k].dataset.label);
-        b.addEventListener("click", function(){ setDial(k); openPanel(keyAt(k)); });
-        b.addEventListener("focus", function(){ dialHeld = true; setDial(k); });
-        b.addEventListener("blur", function(){ dialHeld = false; });
-        wrap.appendChild(b);
-      })(j);
-    }
-
-    /* explicit stepping */
-    var step = document.createElement("div");
-    step.className = "dial-step";
-    var prev = document.createElement("button");
-    prev.type = "button"; prev.textContent = "Back";
-    prev.addEventListener("click", function(){ setDial(dialIndex-1); });
-    var next = document.createElement("button");
-    next.type = "button"; next.textContent = "Next";
-    next.addEventListener("click", function(){ setDial(dialIndex+1); });
-    step.appendChild(prev); step.appendChild(next);
-    wrap.appendChild(step);
-
-    wrap.addEventListener("pointerenter", function(){ dialHeld = true; });
-    wrap.addEventListener("pointerleave", function(){ dialHeld = false; });
-
-    document.body.appendChild(wrap);
-    setDial(0);
-    if(!reduced) dialTimer = setInterval(tick, 3000);
-  }
-
-  function keyAt(i){
-    var n = articles.length;
-    return articles[((i % n) + n) % n].id.replace("sec-","");
-  }
-
-  function setDial(i){
-    var n = articles.length;
-    dialIndex = ((i % n) + n) % n;
-    ringG.style.transform = "rotate(" + (-(360/n)*dialIndex) + "deg)";
-    nowLabel.textContent = articles[dialIndex].dataset.label;
-    coreBtn.setAttribute("aria-label", "Read: " + articles[dialIndex].dataset.label);
-    spokes.forEach(function(sp,k){
-      if(k === dialIndex) sp.classList.add("on"); else sp.classList.remove("on");
-    });
-  }
-
-  function tick(){
-    if(dialHeld) return;
-    if(!panel.hidden) return;
-    setDial(dialIndex + 1);
-  }
-
   /* ---------- flat fallback ---------- */
   function buildFlat(){
     var flat = document.getElementById("flat");
@@ -1250,7 +1056,6 @@
   /* ---------- the void ---------- */
   var canvas = document.getElementById("gl");
 
-  buildDial();
   bootAdd(20);
 
   /* over file:// a browser will not let WebGL sample local images, so the
@@ -1281,42 +1086,27 @@
 
   var scene = new THREE.Scene();
   var cards = [];
-  var tried = 0, got = 0;
+  var tried = 0, got = 0, imgTotal = 0;
 
   function settle(ok){
     tried++;
     if(ok) got++;
-    bootAdd(80/3);
-    if(tried === plan.length && got === 0){
-      /* nothing rendered: fall back so the pictures are still seen */
+    bootAdd(80/Math.max(1, imgTotal));
+    if(tried === imgTotal && got === 0){
+      /* no picture loaded at all: fall back so they are still seen */
       buildFlat();
     }
   }
 
   var camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 200);
-  var baseZ = 9;
-
-  /* pull back far enough that the whole cluster stays in frame at any aspect */
-  var stacked = false;
+  var narrow = false, cardScale = 1;
 
   function fit(){
-    var a = window.innerWidth/window.innerHeight;
-    var half = Math.tan((45*Math.PI/180)/2);
-    stacked = a < 0.95;
-    var W = stacked ? 4.0 : 15.2;
-    var H = stacked ? 5.0 : 8.6;
-    baseZ = Math.max(W/(2*half*a), H/(2*half)) * 1.04;
-    camera.position.z = baseZ;
-
-    for(var i=0;i<cards.length;i++){
-      var m = cards[i];
-      m.visible = !stacked;
-      var q = stacked ? m.userData.plan.mpos : m.userData.plan.pos;
-      m.userData.base.set(q[0], q[1], q[2]);
-      m.position.copy(m.userData.base);
-    }
+    narrow = (window.innerWidth/window.innerHeight) < 0.95;
+    cardScale = narrow ? 0.5 : 1;
+    cards.forEach(function(m){ m.scale.setScalar(cardScale); });
   }
-  camera.position.set(0, 0, 9);
+  camera.position.set(0, 0, 8.5);
   fit();
 
   /* dust */
@@ -1333,45 +1123,100 @@
   }));
   scene.add(dust);
 
-  /* cards */
-  var plan = [
-    {key:"who",      src:"images/portrait.png", w:2.6,
-     pos:[-3.55, 0.20, 1.2], mpos:[ 0.00, 3.15, 1.0], rot:0.05 },
-    {key:"huig",     src:"images/notes.jpg",    w:4.2,
-     pos:[ 3.60, 1.60,-1.2], mpos:[ 0.25,-0.55,-0.5], rot:-0.07},
-    {key:"destined", src:"images/proforma.png", w:5.0,
-     pos:[ 1.40,-2.70,-3.4], mpos:[-0.10,-3.55,-1.4], rot:0.03 }
-  ];
-
+  /* ---- the spine: one card per section, receding into depth ---- */
+  var SPACING = 7.0, FOCAL = 8.5, CARDW = 5.6;
+  var slots = [];        /* {x,y,z} per index */
+  var meshes = [];       /* index aligned with articles */
   var loader = new THREE.TextureLoader();
 
-  plan.forEach(function(p, n){
-    loader.load(p.src, function(tex){
-      tex.minFilter = THREE.LinearFilter;
-      tex.generateMipmaps = false;
-      var ar = (tex.image && tex.image.width) ? tex.image.height/tex.image.width : 1;
-      var geo = new THREE.PlaneGeometry(p.w, p.w*ar);
-      var mat = new THREE.MeshBasicMaterial({map:tex, transparent:true, side:THREE.DoubleSide});
-      var mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(p.pos[0], p.pos[1], p.pos[2]);
-      mesh.rotation.y = p.rot;
-      mesh.userData.key = p.key;
-      mesh.userData.plan = p;
-      mesh.userData.base = mesh.position.clone();
-      mesh.userData.phase = n * 1.9;
-      mesh.userData.slot = n;
-      mat.depthWrite = false;
-      scene.add(mesh);
-      cards.push(mesh);
-      fit();
-      settle(true);
-    }, undefined, function(){
-      /* texture missing or blocked: note it and decide once all are in */
-      settle(false);
-    });
+  articles.forEach(function(a, i){
+    slots[i] = {
+      x: Math.sin(i*0.85) * 1.8,
+      y: Math.cos(i*0.62) * 0.75,
+      z: -i * SPACING
+    };
   });
 
-  /* pointer */
+  imgTotal = articles.filter(function(a){ return a.dataset.img; }).length;
+
+  function place(i, tex, aspect){
+    /* cap height so a portrait plate does not swallow the frame */
+    var w = CARDW, h = CARDW*aspect;
+    if(h > 4.7){ h = 4.7; w = h/aspect; }
+    var geo = new THREE.PlaneGeometry(w, h);
+    var mat = new THREE.MeshBasicMaterial({
+      map: tex, transparent: true, depthWrite: false
+    });
+    var mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(slots[i].x, slots[i].y, slots[i].z);
+    mesh.scale.setScalar(cardScale);
+    mesh.userData.key = articles[i].id.replace("sec-","");
+    mesh.userData.i = i;
+    scene.add(mesh);
+    cards.push(mesh);
+    meshes[i] = mesh;
+  }
+
+  /* sections with no picture get a typographic plate so the spine is unbroken */
+  function plate(title, line){
+    var W = 1100, H = 690;
+    var c = document.createElement("canvas");
+    c.width = W; c.height = H;
+    var g = c.getContext("2d");
+
+    g.fillStyle = "#0C0E14"; g.fillRect(0,0,W,H);
+    g.strokeStyle = "#242A35"; g.lineWidth = 4; g.strokeRect(2,2,W-4,H-4);
+
+    g.fillStyle = "#5B8CFF";
+    g.font = "700 30px ui-monospace, SFMono-Regular, Menlo, monospace";
+    g.fillText(title, 68, 112);
+    g.fillRect(68, 146, 88, 3);
+
+    g.fillStyle = "#C9CDD4";
+    g.font = "300 42px Georgia, serif";
+    var words = line.split(/\s+/), row = "", y = 246;
+    for(var k=0;k<words.length;k++){
+      var test = row ? row + " " + words[k] : words[k];
+      if(g.measureText(test).width > W-136){
+        g.fillText(row, 68, y); y += 58; row = words[k];
+        if(y > H-70) break;
+      }else{ row = test; }
+    }
+    if(row && y <= H-70) g.fillText(row, 68, y);
+
+    var t = new THREE.CanvasTexture(c);
+    t.minFilter = THREE.LinearFilter;
+    t.generateMipmaps = false;
+    return {tex:t, aspect:H/W};
+  }
+
+  function buildSpine(){
+    articles.forEach(function(a, i){
+      if(a.dataset.img){
+        loader.load(a.dataset.img, function(tex){
+          tex.minFilter = THREE.LinearFilter;
+          tex.generateMipmaps = false;
+          var ar = (tex.image && tex.image.width) ? tex.image.height/tex.image.width : 0.66;
+          place(i, tex, ar);
+          settle(true);
+        }, undefined, function(){ settle(false); });
+      }else{
+        var first = a.querySelector(".first");
+        var line = first ? first.textContent.replace(/\s+/g," ").trim() : "";
+        if(line.length > 150) line = line.slice(0,150).replace(/\s+\S*$/,"") + "...";
+        var pl = plate(a.dataset.label, line);
+        place(i, pl.tex, pl.aspect);
+      }
+    });
+  }
+
+  if(document.fonts && document.fonts.ready){
+    document.fonts.ready.then(buildSpine);
+  }else{
+    buildSpine();
+  }
+
+  /* ---- pointer ---- */
   var mouse = new THREE.Vector2(-2,-2);
   var aim = {x:0,y:0};
 
@@ -1406,12 +1251,63 @@
     if(m !== hovered){
       hovered = m;
       canvas.style.cursor = m ? "pointer" : "default";
-      idx.querySelectorAll("button").forEach(function(b){
-        if(!m) { b.style.color = ""; return; }
-        b.style.color = (b.dataset.open === m.userData.key) ? "var(--signal)" : "";
-      });
     }
   }
+
+  /* ---- scroll drives travel down the spine ---- */
+  var n = articles.length;
+  var spacer = document.getElementById("spacer");
+  var readNow = document.getElementById("readNow");
+  var readNowLabel = document.getElementById("readNowLabel");
+  var hint = document.getElementById("hint");
+  var active = -1;
+
+  spacer.style.height = (n * 100) + "vh";
+
+  function maxScroll(){
+    return Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  }
+
+  function setActive(i){
+    if(i === active) return;
+    active = i;
+    readNowLabel.textContent = articles[i].dataset.label;
+    readNow.setAttribute("aria-label", "Read: " + articles[i].dataset.label);
+    idx.querySelectorAll("button").forEach(function(b){
+      b.setAttribute("aria-current", Number(b.dataset.goto) === i ? "true" : "false");
+    });
+  }
+
+  readNow.addEventListener("click", function(){
+    if(active >= 0) openPanel(articles[active].id.replace("sec-",""));
+  });
+
+  document.addEventListener("click", function(e){
+    var g = e.target.closest("[data-goto]");
+    if(!g) return;
+    e.preventDefault();
+    var i = Number(g.dataset.goto);
+    window.scrollTo({top: (i/(n-1)) * maxScroll(), behavior: reduced ? "auto" : "smooth"});
+  });
+
+  function progressNow(){
+    var pr = (panel.hidden ? window.scrollY : keptScroll) / maxScroll();
+    return Math.max(0, Math.min(1, pr));
+  }
+
+  /* the indicator is DOM state, so keep it off the render loop */
+  function syncActive(){
+    setActive(Math.round(progressNow() * (n - 1)));
+  }
+
+  window.addEventListener("scroll", function(){
+    syncActive();
+    if(hint && !hint.classList.contains("gone") && window.scrollY > 40){
+      hint.classList.add("gone");
+    }
+  }, {passive:true});
+
+  syncActive();
 
   window.addEventListener("resize", function(){
     camera.aspect = window.innerWidth/window.innerHeight;
@@ -1423,40 +1319,28 @@
   var t0 = performance.now();
   function frame(){
     var t = (performance.now() - t0)/1000;
+    var f = progressNow() * (n - 1);
+    var i0 = Math.floor(f), i1 = Math.min(n-1, i0+1), fr = f - i0;
+    var sx = slots[i0].x + (slots[i1].x - slots[i0].x)*fr;
+    var sy = slots[i0].y + (slots[i1].y - slots[i0].y)*fr;
 
-    if(!reduced){
-      var sway = Math.min(1, window.innerWidth/900);
-      camera.position.x += ((aim.x*1.1*sway) - camera.position.x)*0.035;
-      camera.position.y += ((aim.y*0.7*sway) - camera.position.y)*0.035;
-      camera.position.z = baseZ;
-      camera.lookAt(0,0,0);
+    var sway = reduced ? 0 : Math.min(1, window.innerWidth/900);
+    camera.position.x += ((sx + aim.x*0.55*sway) - camera.position.x)*0.09;
+    camera.position.y += ((sy + aim.y*0.38*sway) - camera.position.y)*0.09;
+    camera.position.z = -f*SPACING + FOCAL;
 
-      if(stacked){
-        cards.forEach(function(m){
-          var b = m.userData.base, ph = m.userData.phase;
-          m.position.y = b.y + Math.sin(t*0.42 + ph)*0.16;
-          m.position.x = b.x + Math.cos(t*0.31 + ph)*0.09;
-          m.rotation.z = Math.sin(t*0.24 + ph)*0.015;
-        });
-      }else{
-        /* continuous carousel: the work cycles past on its own */
-        var R = 5.0, nn = cards.length || 1;
-        cards.forEach(function(m){
-          var ang = (Math.PI*2/nn)*m.userData.slot + t*0.18;
-          m.position.x = Math.sin(ang)*R;
-          m.position.z = Math.cos(ang)*R;
-          m.position.y = 0.6 + Math.sin(t*0.4 + m.userData.phase)*0.14;
-          m.rotation.y = Math.sin(ang) * 0.3;   /* face the viewer, never edge on */
-          m.rotation.z = 0;
-          var front = (Math.cos(ang) + 1)/2;
-          m.material.opacity = 0.3 + 0.7*front;
-          var sc = 0.88 + 0.12*front;
-          m.scale.set(sc, sc, 1);
-        });
+    cards.forEach(function(m){
+      var d = camera.position.z - m.position.z;
+      m.visible = d > 1.0;
+      if(!m.visible) return;
+      var k = Math.max(0, 1 - Math.abs(d - FOCAL)/19);
+      m.material.opacity = 0.07 + 0.93*k;
+      if(!reduced){
+        m.position.y = slots[m.userData.i].y + Math.sin(t*0.35 + m.userData.i)*0.07;
       }
+    });
 
-      dust.rotation.y = t*0.012;
-    }
+    if(!reduced) dust.rotation.y = t*0.012;
 
     updateHover();
     renderer.render(scene, camera);
