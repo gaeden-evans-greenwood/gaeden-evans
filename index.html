@@ -623,8 +623,8 @@
     <p class="first">
       Greenwood trains minority students for finance. Behavioral prep,
       technicals, and the part nobody inherits, which is the network. I found
-      the recruiter and talked to him before I ever applied, because I wanted
-      him to meet a person rather than read a file. Two rounds later I was in.
+      the recruiter and talked to her before I ever applied, because I wanted
+      her to meet a person rather than read a file. Two rounds later I was in.
     </p>
     <details>
       <summary>What I got certified in</summary>
@@ -799,9 +799,7 @@
         <p>
           BYD also outsold Tesla 2.26 million to 1.64 million in 2025, so the
           survivor story is a US story and not a global one. I think I am right
-          about the share shift. I am less sure that is the same thing as being
-          right about the stock, and I would rather say so than find out in an
-          interview that I had not noticed.
+          about the share shift.
         </p>
       </div>
     </details>
@@ -1413,10 +1411,16 @@
   var hint = document.getElementById("hint");
   var active = -1;
 
-  spacer.style.height = (n * 100) + "vh";
+  /* one extra screen of travel so the last card can be read on its own */
+  spacer.style.height = ((n + 1) * 100) + "vh";
 
   function maxScroll(){
     return Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+  }
+
+  /* index along the spine, held at the last card through the tail */
+  function frameIndex(){
+    return Math.min(n - 1, progressNow() * n);
   }
 
   function setActive(i){
@@ -1438,7 +1442,7 @@
     if(!g) return;
     e.preventDefault();
     var i = Number(g.dataset.goto);
-    window.scrollTo({top: (i/(n-1)) * maxScroll(), behavior: reduced ? "auto" : "smooth"});
+    window.scrollTo({top: (i/n) * maxScroll(), behavior: reduced ? "auto" : "smooth"});
   });
 
   function progressNow(){
@@ -1448,7 +1452,7 @@
 
   /* the indicator is DOM state, so keep it off the render loop */
   function syncActive(){
-    setActive(Math.round(progressNow() * (n - 1)));
+    setActive(Math.round(frameIndex()));
   }
 
   window.addEventListener("scroll", function(){
@@ -1470,7 +1474,7 @@
   var t0 = performance.now();
   function frame(){
     var t = (performance.now() - t0)/1000;
-    var f = progressNow() * (n - 1);
+    var f = frameIndex();
     var i0 = Math.floor(f), i1 = Math.min(n-1, i0+1), fr = f - i0;
     var sx = slots[i0].x + (slots[i1].x - slots[i0].x)*fr;
     var sy = slots[i0].y + (slots[i1].y - slots[i0].y)*fr;
